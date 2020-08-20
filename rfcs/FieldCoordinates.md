@@ -2,11 +2,31 @@
 
 **Champion:** @magicmark
 
-This RFC proposes formalizing "field coordinates" - a way to uniquely identify a
-field defined in a GraphQL Schema.
+This RFC proposes a **GraphQL Schema Selector Language** (selectors) - a way to
+uniquely identify and reference a "component" of a GraphQL Schema.
 
-This may be listed as an appendix item in the official specification to serve as
-an official reference to third party library implementations.
+For example, consider the following schema:
+ 
+```graphql
+type Business {
+  name: String
+}
+```
+
+Given this, we may write the following selector to refer to the `name` field on
+the `Business` type:
+
+``` 
+Business.name
+```
+
+This specification may be useful in third party tooling. For example:
+
+- The lookup key in a logging library to track the most frequently accessed
+  fields in the schema.
+- The label for hyperlinks in a GraphQL IDE when hovering over part of
+  the schema that we wish to link to documentation for.
+- Calculating cache keys for resolver method logic
 
 ## 🚫 What this RFC does _not_ propose
 
@@ -17,17 +37,41 @@ This RFC does not seek to change the GraphQL language in any way.
 
 ## 📜 Problem Statement
 
-Third party GraphQL tooling and libraries may wish to refer to a field, or set of
-fields in a schema. Use cases include documentation, metrics and logging
-libraries.
+There is currently no formal way to express the location of a given AST node in a
+GraphQL Schema.
 
-![](https://i.fluffy.cc/5Cz9cpwLVsH1FsSF9VPVLwXvwrGpNh7q.png)
+Practically speaking, third party GraphQL tooling and libraries sometimes want to
+refer to a field, or set of fields in a schema.
 
-_(Example shown from GraphiQL's documentation search tab)_
+### Use cases
+
+Existing use cases today include popular IDEs, metrics and logging libraries:
+
+- GraphiQL's documentation search tab displays "[field coordinates][field-coords]" 
+  (a dot separated type + field pair) for a search term:
+
+  ![](https://i.fluffy.cc/5Cz9cpwLVsH1FsSF9VPVLwXvwrGpNh7q.png)
+
+- [Apollo Studio][apollo-studio] shows field coordinates as the documentation
+  hyperlink label when when hovering over part of a query:
+
+  ![](https://i.fluffy.cc/g78sJCjCJ0MsbNPhvgPXP46Kh9knBCKF.png)
+
+_(Field coordinates shown in a query - [Apollo Studio](https://www.apollographql.com/docs/studio/)_)
+
+- [GraphQL Inspector](https://github.com/kamilkisiela/graphql-inspector) (840 stars) displays field coordinates in its output:
+
+  ![](https://i.imgur.com/HAf18rz.png)
+
+More use cases and
+examples are shown in the appendix.)_
 
 There already exists a convention used by some third party libraries for writing
 out fields in a unique way for such purposes. However, there is no formal
 specification or name for this convention.
+
+[field-coords]: https://github.com/graphql-java/graphql-java/blob/2acb557474ca73/src/main/java/graphql/schema/FieldCoordinates.java
+[apollo-studio]: https://www.apollographql.com/docs/studio/
 
 ## ✨ Worked Example
 
