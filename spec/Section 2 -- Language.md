@@ -92,6 +92,8 @@ text and separate lexical tokens, any amount may appear before or after any
 other token and have no significance to the semantic meaning of a GraphQL
 Document.
 
+Comments are forbidden within a _schema coordinate_.
+
 Note: Any error reporting which provides the line number in the source of the
 offending syntax should use the preceding amount of {LineTerminator} to produce
 the line number.
@@ -154,15 +156,17 @@ Ignored ::
 - Comma
 
 {Ignored} tokens are used to improve readability and provide separation between
-lexical tokens, but are otherwise insignificant and not referenced in
-syntactical grammar productions.
+lexical tokens in a GraphQL document, but are otherwise insignificant and not
+referenced in syntactical grammar productions. {Ignored} are forbidden within a
+_schema coordinate_.
 
-Any amount of {Ignored} may appear before and after every lexical token. No
-ignored regions of a source document are significant, however {SourceCharacter}
-which appear in {Ignored} may also appear within a lexical {Token} in a
-significant way, for example a {StringValue} may contain white space characters.
-No {Ignored} may appear _within_ a {Token}, for example no white space
-characters are permitted between the characters defining a {FloatValue}.
+Any amount of {Ignored} may appear before and after every lexical token in a
+GraphQL document. No ignored regions of a source document are significant,
+however {SourceCharacter} which appear in {Ignored} may also appear within a
+lexical {Token} in a significant way, for example a {StringValue} may contain
+white space characters. No {Ignored} may appear _within_ a {Token}, for example
+no white space characters are permitted between the characters defining a
+{FloatValue}.
 
 **Byte Order Mark**
 
@@ -172,7 +176,7 @@ The _Byte Order Mark_ is a special Unicode code point which may appear at the
 beginning of a file which programs may use to determine the fact that the text
 stream is Unicode, and what specific encoding has been used. As files are often
 concatenated, a _Byte Order Mark_ may appear before or after any lexical token
-and is {Ignored}.
+and is {Ignored}. {UnicodeBOM} is forbidden within a _schema coordinate_.
 
 ### Punctuators
 
