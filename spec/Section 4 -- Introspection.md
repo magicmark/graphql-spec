@@ -147,7 +147,7 @@ type __Type {
   description: String
   # may be non-null for custom SCALAR, otherwise null.
   specifiedByURL: String
-  # must be non-null for OBJECT and INTERFACE, otherwise null.
+  # must be non-null for OBJECT, INTERFACE, and STRUCT, otherwise null.
   fields(includeDeprecated: Boolean! = false): [__Field!]
   # must be non-null for OBJECT and INTERFACE, otherwise null.
   interfaces: [__Type!]
@@ -155,11 +155,11 @@ type __Type {
   possibleTypes: [__Type!]
   # must be non-null for ENUM, otherwise null.
   enumValues(includeDeprecated: Boolean! = false): [__EnumValue!]
-  # must be non-null for INPUT_OBJECT, otherwise null.
+  # must be non-null for INPUT_OBJECT and STRUCT, otherwise null.
   inputFields(includeDeprecated: Boolean! = false): [__InputValue!]
   # must be non-null for NON_NULL and LIST, otherwise null.
   ofType: __Type
-  # must be non-null for INPUT_OBJECT, otherwise null.
+  # must be non-null for INPUT_OBJECT and STRUCT, otherwise null.
   isOneOf: Boolean
 }
 
@@ -169,7 +169,8 @@ enum __TypeKind {
   INTERFACE
   UNION
   ENUM
-  INPUT_OBJECT
+  INPUT_OBJECT @deprecated(reason: "Use STRUCT.")
+  STRUCT
   LIST
   NON_NULL
 }
@@ -229,6 +230,8 @@ enum __DirectiveLocation {
   ENUM_VALUE
   INPUT_OBJECT
   INPUT_FIELD_DEFINITION
+  STRUCT
+  STRUCT_FIELD_DEFINITION
   DIRECTIVE_DEFINITION
 }
 ```
@@ -276,6 +279,7 @@ possible value of the `__TypeKind` enum:
 - {"UNION"}
 - {"ENUM"}
 - {"INPUT_OBJECT"}
+- {"STRUCT"}
 - {"LIST"}
 - {"NON_NULL"}
 
@@ -367,9 +371,10 @@ Fields\:
 
 **Input Object**
 
-Input objects are composite types defined as a list of named input values. They
-are only used as inputs to arguments and variables and cannot be a field return
-type.
+Input objects are composite types defined as a list of named input values. The
+`input` keyword is a deprecated alias for `struct`; types defined with `input`
+report kind `INPUT_OBJECT` for backwards compatibility. New schemas should use
+the `struct` keyword instead.
 
 For example the input object `Point` could be defined as:
 
@@ -390,6 +395,38 @@ Fields\:
     {true}, deprecated input fields are also returned.
 - `isOneOf` must return {true} when representing a _OneOf Input Object_,
   otherwise {false}.
+- All other fields must return {null}.
+
+**Struct**
+
+Structs are composite types that can appear in both input and output positions.
+They define a set of named fields without per-field resolvers. Types defined
+with the `struct` keyword report kind `STRUCT`.
+
+For example the struct `Point` could be defined as:
+
+```graphql example
+struct Point {
+  x: Int
+  y: Int
+}
+```
+
+Fields\:
+
+- `kind` must return `__TypeKind.STRUCT`.
+- `name` must return a String.
+- `description` may return a String or {null}.
+- `fields` must return the set of fields as a list of `__Field`. These fields do
+  not accept arguments.
+  - Accepts the argument `includeDeprecated` which defaults to {false}. If
+    {true}, deprecated fields are also returned.
+- `inputFields` must return the set of fields as a list of `__InputValue` (for
+  backwards compatibility with clients that query input fields).
+  - Accepts the argument `includeDeprecated` which defaults to {false}. If
+    {true}, deprecated fields are also returned.
+- `isOneOf` must return {true} when representing a _OneOf Struct_, otherwise
+  {false}.
 - All other fields must return {null}.
 
 **List**

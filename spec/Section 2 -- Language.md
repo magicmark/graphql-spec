@@ -1481,14 +1481,14 @@ MemberCoordinate :: Name . Name
 
 1. Let {typeName} be the value of the first {Name}.
 2. Let {type} be the type in {schema} named {typeName}.
-3. Assert: {type} must exist, and must be an Enum, Input Object, Object or
-   Interface type.
+3. Assert: {type} must exist, and must be an Enum, Input Object, Struct, Object
+   or Interface type.
 4. If {type} is an Enum type:
    1. Let {enumValueName} be the value of the second {Name}.
    2. Return the enum value of {type} named {enumValueName} if it exists.
-5. Otherwise, if {type} is an Input Object type:
-   1. Let {inputFieldName} be the value of the second {Name}.
-   2. Return the input field of {type} named {inputFieldName} if it exists.
+5. Otherwise, if {type} is an Input Object or Struct type:
+   1. Let {fieldName} be the value of the second {Name}.
+   2. Return the field of {type} named {fieldName} if it exists.
 6. Otherwise:
    1. Let {fieldName} be the value of the second {Name}.
    2. Return the field of {type} named {fieldName} if it exists.

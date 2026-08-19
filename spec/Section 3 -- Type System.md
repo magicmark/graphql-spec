@@ -311,8 +311,9 @@ TypeDefinition :
 - UnionTypeDefinition
 - EnumTypeDefinition
 - InputObjectTypeDefinition
+- StructTypeDefinition
 
-The fundamental unit of any GraphQL Schema is the type. There are six kinds of
+The fundamental unit of any GraphQL Schema is the type. There are seven kinds of
 named type definitions in GraphQL, and two wrapping types.
 
 The most basic type is a `Scalar`. A scalar represents a primitive value, like a
@@ -335,9 +336,15 @@ A `Union` defines a list of possible types; similar to interfaces, whenever the
 type system claims a union will be returned, one of the possible types will be
 returned.
 
+A `Struct` defines a set of named fields that can appear in both input and
+output positions. Unlike Object types, struct fields do not have resolvers and
+selection sets are optional in output position (omitting a selection set returns
+all fields). The `Input Object` type is a deprecated alias for `Struct` that
+remains for backwards compatibility.
+
 Finally, oftentimes it is useful to provide complex structs as inputs to GraphQL
-field arguments or variables; the `Input Object` type allows the schema to
-define exactly what data is expected.
+field arguments or variables; the `Struct` type allows the schema to define
+exactly what data is expected.
 
 ### Wrapping Types
 
@@ -361,17 +368,18 @@ Types are used throughout GraphQL to describe both the values accepted as input
 to arguments and variables as well as the values output by fields. These two
 uses categorize types as _input types_ and _output types_. Some kinds of types,
 like Scalar and Enum types, can be used as both input types and output types;
-other kinds of types can only be used in one or the other. Input Object types
-can only be used as input types. Object, Interface, and Union types can only be
-used as output types. Lists and Non-Null types may be used as input types or
-output types depending on how the wrapped type may be used.
+other kinds of types can only be used in one or the other. Struct types (and
+their deprecated alias, Input Object types) can be used as both input types and
+output types. Object, Interface, and Union types can only be used as output
+types. Lists and Non-Null types may be used as input types or output types
+depending on how the wrapped type may be used.
 
 IsInputType(type):
 
 - If {type} is a List type or Non-Null type:
   - Let {unwrappedType} be the unwrapped type of {type}.
   - Return {IsInputType(unwrappedType)}.
-- If {type} is a Scalar, Enum, or Input Object type:
+- If {type} is a Scalar, Enum, Input Object, or Struct type:
   - Return {true}.
 - Return {false}.
 
@@ -380,7 +388,7 @@ IsOutputType(type):
 - If {type} is a List type or Non-Null type:
   - Let {unwrappedType} be the unwrapped type of {type}.
   - Return {IsOutputType(unwrappedType)}.
-- If {type} is a Scalar, Object, Interface, Union, or Enum type:
+- If {type} is a Scalar, Object, Interface, Union, Enum, or Struct type:
   - Return {true}.
 - Return {false}.
 
@@ -394,6 +402,7 @@ TypeExtension :
 - UnionTypeExtension
 - EnumTypeExtension
 - InputObjectTypeExtension
+- StructTypeExtension
 
 Type extensions are used to represent a GraphQL type which has been extended
 from some previous type. For example, this might be used by a local service to
@@ -1453,9 +1462,12 @@ Unions are never valid inputs.
 Union types have the potential to be invalid if incorrectly defined.
 
 1. A Union type must include one or more unique member types.
-2. The member types of a Union type must all be Object base types; Scalar,
-   Interface and Union types must not be member types of a Union. Similarly,
-   wrapping types must not be member types of a Union.
+2. The member types of a Union type must all be Object or Struct base types;
+   Scalar, Interface and Union types must not be member types of a Union.
+   Similarly, wrapping types must not be member types of a Union.
+3. The member types of a Union type must be homogeneous: either all Object types
+   or all Struct types. A union must not contain a mix of Object and Struct
+   member types.
 
 ### Union Extensions
 
@@ -1864,6 +1876,284 @@ defined.
    2. All fields of the Input Object type extension must not have default
       values.
 
+## Structs
+
+StructTypeDefinition :
+
+- Description? struct Name Directives[Const]? StructFieldsDefinition?
+- Description? struct Name Directives[Const]? [lookahead != `{`]
+
+StructFieldsDefinition : { StructFieldDefinition+ }
+
+StructFieldDefinition : Description? Name : Type DefaultValue?
+Directives[Const]?
+
+:: A GraphQL _Struct_ defines a set of named fields. Unlike Object types, struct
+fields do not accept arguments and do not have individual resolvers. Structs can
+appear in both input and output positions, making them suitable for representing
+structured data that flows symmetrically through a GraphQL schema.
+
+The `struct` keyword is the canonical way to define structured input/output
+types. The `input` keyword is a deprecated alias that produces an Input Object
+type with equivalent semantics in input position but without output-position
+capabilities.
+
+In this example, a Struct called `Point2D` describes `x` and `y` fields:
+
+```graphql example
+struct Point2D {
+  x: Float
+  y: Float
+}
+```
+
+A struct can be used as a field return type and as an argument type:
+
+```graphql example
+type Query {
+  origin: Point2D
+  distance(from: Point2D!, to: Point2D!): Float
+}
+```
+
+When a field returns a struct, the selection set is optional. Omitting the
+selection set returns all fields of the struct (wildcard selection):
+
+```graphql example
+{
+  origin
+}
+```
+
+This is equivalent to explicitly selecting all fields:
+
+```graphql example
+{
+  origin {
+    x
+    y
+  }
+}
+```
+
+**Circular References**
+
+Structs are allowed to reference other Structs as field types. A circular
+reference occurs when a Struct references itself either directly or through
+referenced Structs.
+
+Circular references are generally allowed, however they may not be defined as an
+unbroken chain of Non-Null singular fields. Such Structs are invalid because
+there is no way to provide a legal value for them.
+
+This example of a circularly-referenced struct type is valid as the field `self`
+may be omitted or the value {null}.
+
+```graphql example
+struct Example {
+  self: Example
+  value: String
+}
+```
+
+This example of a circularly-referenced struct type is invalid as the field
+`self` cannot be provided a finite value.
+
+```graphql counter-example
+struct Example {
+  self: Example!
+  value: String
+}
+```
+
+**Result Coercion**
+
+When a struct type is the return type of a field, the resolved value must be an
+unordered map of field names to values. Each field value is coerced according to
+the result coercion rules of that field's type.
+
+**Input Coercion**
+
+The value for a struct should be an input object literal or an unordered map
+supplied by a variable, otherwise a _request error_ must be raised. In either
+case, the input object literal or unordered map must not contain any entries
+with names not defined by a field of this struct type, otherwise a request error
+must be raised.
+
+The result of coercion is an unordered map with an entry for each field both
+defined by the struct type and for which a value exists. The resulting map is
+constructed with the following rules:
+
+- If no value is provided for a defined struct field and that field definition
+  provides a default value, the result of coercing the default value according
+  to the coercion rules of the field type should be used. If no default value is
+  provided and the struct field's type is non-null, an error should be raised.
+  Otherwise, if the field is not required, then no entry is added to the coerced
+  unordered map.
+
+- If the value {null} was provided for a struct field, and the field's type is
+  not a non-null type, an entry in the coerced unordered map is given the value
+  {null}. In other words, there is a semantic difference between the explicitly
+  provided value {null} versus having not provided a value.
+
+- If a literal value is provided for a struct field, an entry in the coerced
+  unordered map is given the result of coercing that value according to the
+  input coercion rules for the type of that field.
+
+- If a variable is provided for a struct field, the runtime value of that
+  variable must be used. If the runtime value is {null} and the field type is
+  non-null, an _execution error_ must be raised. If no runtime value is
+  provided, the variable definition's default value should be used. If the
+  variable definition does not provide a default value, the struct field
+  definition's default value should be used.
+
+**Wildcard Selection**
+
+When a field's return type is a Struct type and no selection set is provided,
+all fields of the struct are implicitly selected (wildcard selection). This is
+equivalent to writing a selection set that selects every field of the struct.
+
+For struct fields whose type is also a Struct, wildcard selection applies
+recursively.
+
+When a field's return type is a Union of Struct types (a _struct union_) and no
+selection set is provided, all fields are returned along with the `__typename`
+meta-field to allow type discrimination.
+
+**Struct Unions**
+
+:: A _struct union_ is a Union type whose member types are all Struct types. In
+a struct union, the `__typename` meta-field is available to discriminate between
+members.
+
+When querying a struct union field without a selection set, the result includes
+`__typename` and all fields of the resolved struct member.
+
+```graphql example
+struct Circle {
+  radius: Float
+}
+
+struct Rectangle {
+  width: Float
+  height: Float
+}
+
+union Shape = Circle | Rectangle
+
+type Query {
+  shape: Shape
+}
+```
+
+A query may omit the selection set for wildcard behavior:
+
+```graphql example
+{
+  shape
+}
+```
+
+Or use typed fragments for specific fields:
+
+```graphql example
+{
+  shape {
+    __typename
+    ... on Circle {
+      radius
+    }
+    ... on Rectangle {
+      width
+      height
+    }
+  }
+}
+```
+
+**Type Validation**
+
+1. A Struct type must define one or more fields.
+2. For each field of a Struct type:
+   1. The field must have a unique name within that Struct type; no two fields
+      may share the same name.
+   2. The field must not have a name which begins with the characters {"\_\_"}
+      (two underscores).
+   3. The field must accept a type where {IsInputType(fieldType)} returns
+      {true}.
+   4. If field type is Non-Null and a default value is not defined:
+      1. The `@deprecated` directive must not be applied to this field.
+   5. If the Struct is a _OneOf Struct_ then:
+      1. The type of the field must be nullable.
+      2. The field must not have a default value.
+3. If a Struct references itself either directly or through referenced Structs,
+   at least one of the fields in the chain of references must be either a
+   nullable or a List type.
+
+### OneOf Structs
+
+:: A _OneOf Struct_ is a special variant of _Struct_ where exactly one field
+must be set and non-null, all others being omitted. This is useful for
+representing situations where an input may be one of many different options.
+
+When using the type system definition language, the [`@oneOf`](#sec--oneOf)
+directive is used to indicate that a Struct is a OneOf Struct (and thus requires
+exactly one of its fields be provided):
+
+```graphql
+struct UserUniqueCondition @oneOf {
+  id: ID
+  username: String
+  organizationAndEmail: OrganizationAndEmailInput
+}
+```
+
+In schema introspection, the `__Type.isOneOf` field will return {true} for OneOf
+Structs, and {false} for all other Structs.
+
+**Input Coercion**
+
+The value of a OneOf Struct, as a variant of Struct, must also be an input
+object literal or an unordered map supplied by a variable, otherwise a _request
+error_ must be raised.
+
+- Prior to construction of the coerced map via the input coercion rules of a
+  _Struct_: the value to be coerced must contain exactly one entry and that
+  entry must not be {null} or the {null} literal, otherwise a _request error_
+  must be raised.
+
+- All _Struct_ [input coercion rules](#sec-Structs.Input-Coercion) must also
+  apply to a _OneOf Struct_.
+
+- The resulting coerced map must contain exactly one entry and the value for
+  that entry must not be {null}, otherwise an _execution error_ must be raised.
+
+### Struct Extensions
+
+StructTypeExtension :
+
+- extend struct Name Directives[Const]? StructFieldsDefinition
+- extend struct Name Directives[Const] [lookahead != `{`]
+
+Struct type extensions are used to represent a struct type which has been
+extended from some previous struct type. For example, this might be used by a
+GraphQL service which is itself an extension of another GraphQL service.
+
+**Type Validation**
+
+Struct type extensions have the potential to be invalid if incorrectly defined.
+
+1. The named type must already be defined and must be a Struct type.
+2. All fields of a Struct type extension must have unique names.
+3. All fields of a Struct type extension must not already be a field of the
+   previous Struct.
+4. Any non-repeatable directives provided must not already apply to the previous
+   Struct type.
+5. The `@oneOf` directive must not be provided by a Struct type extension.
+6. If the original Struct is a _OneOf Struct_ then:
+   1. All fields of the Struct type extension must be nullable.
+   2. All fields of the Struct type extension must not have default values.
+
 ## List
 
 A GraphQL list is a special collection type which declares the type of each item
@@ -2070,6 +2360,8 @@ TypeSystemDirectiveLocation : one of
 - `ENUM_VALUE`
 - `INPUT_OBJECT`
 - `INPUT_FIELD_DEFINITION`
+- `STRUCT`
+- `STRUCT_FIELD_DEFINITION`
 - `DIRECTIVE_DEFINITION`
 
 A GraphQL schema describes directives which are used to annotate various parts
@@ -2310,11 +2602,12 @@ scalar UUID @specifiedBy(url: "https://tools.ietf.org/html/rfc4122")
 ### @oneOf
 
 ```graphql
-directive @oneOf on INPUT_OBJECT
+directive @oneOf on INPUT_OBJECT | STRUCT
 ```
 
 The `@oneOf` _built-in directive_ is used within the type system definition
-language to indicate an _Input Object_ is a _OneOf Input Object_.
+language to indicate an _Input Object_ is a _OneOf Input Object_ or a _Struct_
+is a _OneOf Struct_.
 
 ```graphql example
 input UserUniqueCondition @oneOf {

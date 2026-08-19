@@ -723,6 +723,8 @@ fragment conflictingDifferingResponses on Pet {
     - The subselection set of that selection must be empty.
   - If {selectionType} is an interface, union, or object:
     - The subselection set of that selection must not be empty.
+  - If {selectionType} is a struct:
+    - The subselection set of that selection may be empty (wildcard selection).
 
 **Explanatory Text**
 
@@ -748,7 +750,9 @@ fragment scalarSelectionsNotAllowedOnInt on Dog {
 ```
 
 Conversely, non-leaf fields must have a field subselection. A non-leaf field is
-any field with an object, interface, or union unwrapped type.
+any field with an object, interface, or union unwrapped type. Struct fields are
+an exception: a subselection set is optional, and omitting it selects all fields
+(wildcard selection).
 
 Let's assume the following additions to the query root operation type of the
 schema:
@@ -785,6 +789,24 @@ query directQueryOnObjectWithSubFields {
   human {
     name
   }
+}
+```
+
+Fields returning a Struct type may omit the subselection set. Both of the
+following are valid:
+
+```graphql example
+query structWithSubSelection {
+  origin {
+    x
+    y
+  }
+}
+```
+
+```graphql example
+query structWithWildcard {
+  origin
 }
 ```
 

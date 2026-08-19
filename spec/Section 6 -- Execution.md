@@ -843,11 +843,18 @@ CompleteValue(fieldType, fields, result, variableValues):
     {resultItem} is each item in {result}.
 - If {fieldType} is a Scalar or Enum type:
   - Return the result of {CoerceResult(fieldType, result)}.
+- If {fieldType} is a Struct type:
+  - Return the result of {CompleteStructValue(fieldType, fields, result,
+    variableValues)}.
 - If {fieldType} is an Object, Interface, or Union type:
   - If {fieldType} is an Object type.
     - Let {objectType} be {fieldType}.
   - Otherwise if {fieldType} is an Interface or Union type.
-    - Let {objectType} be {ResolveAbstractType(fieldType, result)}.
+    - Let {resolvedType} be {ResolveAbstractType(fieldType, result)}.
+    - If {resolvedType} is a Struct type:
+      - Return the result of {CompleteStructValue(resolvedType, fields, result,
+        variableValues)}.
+    - Let {objectType} be {resolvedType}.
   - Let {collectedFieldsMap} be the result of calling
     {CollectSubfields(objectType, fields, variableValues)}.
   - Return the result of evaluating {ExecuteCollectedFields(collectedFieldsMap,
@@ -878,12 +885,63 @@ Note: If a field resolver returns {null} then it is handled within
 {CompleteValue()} before {CoerceResult()} is called. Therefore both the input
 and output of {CoerceResult()} must not be {null}.
 
+**Completing Struct Values**
+
+When a field's return type is a Struct type, the resolved value is completed by
+returning its fields. Unlike Object types, struct fields do not have individual
+resolvers; the resolved value is an unordered map whose entries correspond to
+the struct's defined fields.
+
+CompleteStructValue(structType, fields, result, variableValues):
+
+- Assert: {result} is an unordered map.
+- Let {firstField} be the first entry in {fields}.
+- Let {selectionSet} be the selection set of {firstField}.
+- If {selectionSet} is empty (wildcard selection):
+  - Let {completedResult} be a new unordered map.
+  - For each {structField} defined on {structType}:
+    - Let {fieldName} be the name of {structField}.
+    - Let {fieldType} be the type of {structField}.
+    - Let {fieldValue} be the value for {fieldName} in {result}, or {null} if
+      not present.
+    - Let {completedFieldValue} be the result of calling
+      {CompleteValue(fieldType, fields, fieldValue, variableValues)} where
+      {fields} contains only a synthetic field entry for {fieldName} with an
+      empty selection set.
+    - Add an entry to {completedResult} named {fieldName} with the value
+      {completedFieldValue}.
+  - If {structType} is a member of a Union type, add an entry {"\_\_typename"}
+    with the value being the name of {structType}.
+  - Return {completedResult}.
+- Otherwise:
+  - Let {completedResult} be a new unordered map.
+  - Let {collectedFieldsMap} be the result of collecting fields from
+    {selectionSet} given {structType} and {variableValues}.
+  - For each {collectedFieldsMap} as {responseName} and {collectedFields}:
+    - Let {fieldName} be the name of the first entry in {collectedFields}.
+    - If {fieldName} is {"\_\_typename"}:
+      - Add an entry to {completedResult} named {responseName} with the value
+        being the name of {structType}.
+    - Otherwise:
+      - Let {structField} be the field of {structType} named {fieldName}.
+      - Let {fieldType} be the type of {structField}.
+      - Let {fieldValue} be the value for {fieldName} in {result}, or {null} if
+        not present.
+      - Let {completedFieldValue} be the result of calling
+        {CompleteValue(fieldType, collectedFields, fieldValue, variableValues)}.
+      - Add an entry to {completedResult} named {responseName} with the value
+        {completedFieldValue}.
+  - Return {completedResult}.
+
 **Resolving Abstract Types**
 
 When completing a field with an abstract return type, that is an Interface or
 Union return type, first the abstract type must be resolved to a relevant Object
-type. This determination is made by the internal system using whatever means
-appropriate.
+or Struct type. This determination is made by the internal system using whatever
+means appropriate.
+
+For a Union whose members are all Struct types (a _struct union_), the resolved
+type must be one of the Struct member types.
 
 Note: A common method of determining the Object type for an {objectValue} in
 object-oriented environments, such as Java or C#, is to use the class name of
@@ -892,7 +950,7 @@ the {objectValue}.
 ResolveAbstractType(abstractType, objectValue):
 
 - Return the result of calling the internal method provided by the type system
-  for determining the Object type of {abstractType} given the value
+  for determining the Object or Struct type of {abstractType} given the value
   {objectValue}.
 
 ### Handling Execution Errors
