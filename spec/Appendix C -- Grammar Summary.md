@@ -279,6 +279,7 @@ TypeDefinition :
 - InterfaceTypeDefinition
 - UnionTypeDefinition
 - EnumTypeDefinition
+- StructObjectTypeDefinition
 - InputObjectTypeDefinition
 
 TypeExtension :
@@ -288,6 +289,7 @@ TypeExtension :
 - InterfaceTypeExtension
 - UnionTypeExtension
 - EnumTypeExtension
+- StructObjectTypeExtension
 - InputObjectTypeExtension
 
 ScalarTypeDefinition : Description? scalar Name Directives[Const]?
@@ -365,6 +367,18 @@ EnumTypeExtension :
 - extend enum Name Directives[Const]? EnumValuesDefinition
 - extend enum Name Directives[Const] [lookahead != `{`]
 
+StructObjectTypeDefinition :
+
+- Description? struct Name Directives[Const]? StructFieldsDefinition
+- Description? struct Name Directives[Const]? [lookahead != `{`]
+
+StructFieldsDefinition : { InputValueDefinition+ }
+
+StructObjectTypeExtension :
+
+- extend struct Name Directives[Const]? StructFieldsDefinition
+- extend struct Name Directives[Const] [lookahead != `{`]
+
 InputObjectTypeDefinition :
 
 - Description? input Name Directives[Const]? InputFieldsDefinition
@@ -414,6 +428,7 @@ TypeSystemDirectiveLocation : one of
 - `UNION`
 - `ENUM`
 - `ENUM_VALUE`
+- `STRUCT_OBJECT`
 - `INPUT_OBJECT`
 - `INPUT_FIELD_DEFINITION`
 - `DIRECTIVE_DEFINITION`

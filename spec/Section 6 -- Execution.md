@@ -843,6 +843,9 @@ CompleteValue(fieldType, fields, result, variableValues):
     {resultItem} is each item in {result}.
 - If {fieldType} is a Scalar or Enum type:
   - Return the result of {CoerceResult(fieldType, result)}.
+- If {fieldType} is a Struct type:
+  - Return the result of {CompleteStructValue(fieldType, fields, result,
+    variableValues)}.
 - If {fieldType} is an Object, Interface, or Union type:
   - If {fieldType} is an Object type.
     - Let {objectType} be {fieldType}.
@@ -894,6 +897,36 @@ ResolveAbstractType(abstractType, objectValue):
 - Return the result of calling the internal method provided by the type system
   for determining the Object type of {abstractType} given the value
   {objectValue}.
+
+### Completing Struct Values
+
+CompleteStructValue(structType, fields, result, variableValues):
+
+- Assert: {result} is an unordered map (or {null}, handled earlier).
+- If {structType} is a _OneOf Struct_:
+  - Let {nonNullEntries} be the entries in {result} whose values are not {null}.
+  - If the count of {nonNullEntries} is not exactly 1, raise an _execution
+    error_.
+- Let {completedMap} be an empty ordered map.
+- Let {selectedFields} be the set of fields to complete:
+  - If the selection set for this field position is empty (wildcard selection),
+    {selectedFields} is all fields defined on {structType}.
+  - Otherwise, {selectedFields} is the set of fields selected by the selection
+    set.
+- For each {structField} in {selectedFields}:
+  - Let {fieldName} be the name of {structField} (or its alias).
+  - Let {fieldType} be the type of {structField}.
+  - Let {fieldValue} be the value for {fieldName} in {result}.
+  - If {fieldValue} does not exist in {result}:
+    - If {structField} has a default value:
+      - Let {fieldValue} be the default value of {structField}.
+    - Otherwise:
+      - Let {fieldValue} be {null}.
+  - Let {completedValue} be the result of calling {CompleteValue(fieldType,
+    fields, fieldValue, variableValues)}.
+  - Add an entry to {completedMap} with key {fieldName} and value
+    {completedValue}.
+- Return {completedMap}.
 
 ### Handling Execution Errors
 

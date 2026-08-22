@@ -721,13 +721,18 @@ fragment conflictingDifferingResponses on Pet {
   - Let {selectionType} be the unwrapped result type of {selection}.
   - If {selectionType} is a scalar or enum:
     - The subselection set of that selection must be empty.
+  - If {selectionType} is a struct:
+    - The subselection set of that selection may be empty (wildcard selection)
+      or non-empty.
   - If {selectionType} is an interface, union, or object:
     - The subselection set of that selection must not be empty.
 
 **Explanatory Text**
 
 :: A field subselection is not allowed on leaf fields. A _leaf field_ is any
-field with a scalar or enum unwrapped type.
+field with a scalar or enum unwrapped type. A field with a struct unwrapped type
+may optionally include a subselection; omitting it selects all fields
+recursively (wildcard selection).
 
 The following is valid.
 
