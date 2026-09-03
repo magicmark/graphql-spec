@@ -755,6 +755,11 @@ fragment scalarSelectionsNotAllowedOnInt on Dog {
 Conversely, non-leaf fields must have a field subselection. A non-leaf field is
 any field with an object, interface, or union unwrapped type.
 
+A field with a struct unwrapped type falls into neither category: it may include
+a subselection to select specific fields, or omit the subselection entirely
+(wildcard selection). If a subselection is present, each selected field must be
+defined on the struct.
+
 Let's assume the following additions to the query root operation type of the
 schema:
 
