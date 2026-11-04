@@ -59,6 +59,7 @@ type Dog implements Pet {
   doesKnowCommand(dogCommand: DogCommand!): Boolean!
   isHouseTrained(atOtherHomes: Boolean): Boolean!
   owner: Human
+  microchip: MicrochipData
 }
 
 interface Sentient {
@@ -67,6 +68,7 @@ interface Sentient {
 
 interface Pet {
   name: String!
+  microchip: MicrochipData
 }
 
 type Alien implements Sentient {
@@ -88,6 +90,7 @@ type Cat implements Pet {
   nickname: String
   doesKnowCommand(catCommand: CatCommand!): Boolean!
   meowVolume: Int
+  microchip: MicrochipData
 }
 
 union CatOrDog = Cat | Dog
@@ -114,6 +117,17 @@ input DogInput {
 input PetInput @oneOf {
   cat: CatInput
   dog: DogInput
+}
+
+struct MicrochipData {
+  serial: String!
+  owner: ChipContactDetails!
+}
+
+struct ChipContactDetails {
+  name: String!
+  phone: String!
+  address: String!
 }
 ```
 
@@ -725,6 +739,8 @@ fragment conflictingDifferingResponses on Pet {
     - The subselection set of that selection must not be present.
   - If {selectionType} is an interface, union, or object:
     - The subselection set of that selection must be present.
+  - If {selectionType} is a struct:
+    - The subselection set of that selection may or may not be present.
 
 **Explanatory Text**
 
@@ -803,6 +819,31 @@ The subselection is permitted to be empty, so the following is also valid.
 ```graphql example
 query directQueryOnObjectWithEmptySelection {
   human {}
+}
+```
+
+Uniquely, structs are neither leaf fields or non-leaf fields. A subselection is
+optional:
+
+```graphql example
+query withStructSubSelection {
+  dog {
+    microchip {
+      serial
+    }
+  }
+}
+
+query withoutStructSubSelection {
+  dog {
+    microchip
+  }
+}
+
+query withEmptyStructSubSelection {
+  dog {
+    microchip {}
+  }
 }
 ```
 

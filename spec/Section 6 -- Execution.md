@@ -864,6 +864,9 @@ CompleteValue(fieldType, fields, result, variableValues):
     {resultItem} is each item in {result}.
 - If {fieldType} is a Scalar or Enum type:
   - Return the result of {CoerceResult(fieldType, result)}.
+- If {fieldType} is a Struct type:
+  - Return the result of {CompleteStructValue(fieldType, fields, result,
+    variableValues)}.
 - If {fieldType} is an Object, Interface, or Union type:
   - If {fieldType} is an Object type.
     - Let {objectType} be {fieldType}.
@@ -915,6 +918,60 @@ ResolveAbstractType(abstractType, objectValue):
 - Return the result of calling the internal method provided by the type system
   for determining the Object type of {abstractType} given the value
   {objectValue}.
+
+### Completing Struct Values
+
+CompleteStructValue(structType, fields, result, variableValues):
+
+- Assert: {result} is an unordered map (or {null}, handled earlier).
+- If {structType} is a _OneOf Struct_:
+  - Let {nonNullEntries} be the entries in {result} whose values are not {null}.
+  - If the count of {nonNullEntries} is not exactly 1, raise an _execution
+    error_.
+- Let {completedMap} be an empty ordered map.
+- If {fields} is {null}, or any {field} in {fields} has no selection set
+  (wildcard selection):
+  - For each {structField} defined by {structType}, in definition order:
+    - Let {fieldName} be the name of {structField}.
+    - Let {fieldType} be the type of {structField}.
+    - Let {fieldValue} be {GetStructFieldValue(structField, result)}.
+    - Let {completedValue} be the result of calling {CompleteValue(fieldType,
+      null, fieldValue, variableValues)}.
+    - Add an entry to {completedMap} with key {fieldName} and value
+      {completedValue}.
+- Otherwise:
+  - Let {collectedFieldsMap} be the result of calling
+    {CollectSubfields(structType, fields, variableValues)}.
+  - For each {responseName} and {subfields} in {collectedFieldsMap}:
+    - Let {fieldName} be the name of the first entry in {subfields}. Note: This
+      value is unaffected if an alias is used.
+    - Let {structField} be the field {fieldName} defined by {structType}.
+    - If {structField} is defined:
+      - Let {fieldType} be the type of {structField}.
+      - Let {fieldValue} be {GetStructFieldValue(structField, result)}.
+      - Let {completedValue} be the result of calling {CompleteValue(fieldType,
+        subfields, fieldValue, variableValues)}.
+      - Add an entry to {completedMap} with key {responseName} and value
+        {completedValue}.
+- Return {completedMap}.
+
+GetStructFieldValue(structField, result):
+
+- Let {fieldName} be the name of {structField}.
+- If {result} has an entry with key {fieldName}:
+  - Return the value of that entry.
+- If {structField} has a default value:
+  - Return the default value of {structField}.
+- Return {null}.
+
+Note: Passing {null} as {fields} marks a wildcard selection. A wildcard
+selection applies to the full Struct value, so every nested Struct field is also
+completed as a wildcard selection. When a selection set is present, each nested
+Struct field uses its own subselection: if a nested field has no selection set,
+its full value is returned; otherwise only its selected fields are returned.
+Field collection rules (including `@skip`, `@include` and fragments without a
+type condition) apply to Struct selection sets in the same way as to Object
+selection sets.
 
 ### Handling Execution Errors
 
